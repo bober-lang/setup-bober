@@ -1,0 +1,8 @@
+import { primes } from "./primes"
+
+test "primes" {
+	assert primes(100) == 25
+	for (const _ of 1 ... 30) {
+		assert primes(10000000) == 664579
+	}
+}

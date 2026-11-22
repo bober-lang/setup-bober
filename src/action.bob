@@ -1,0 +1,67 @@
+//! Installs bober and restores a project's build image, which the post step, run with the argument post, saves once it
+//! changed. Cached of the build directory are image.so, what bober compiled, and kept, the reports of tests whose code
+//! did not change, as one archive, image.tar: the image is sparse, and only tar -S keeps its holes.
+
+import { addPath, getBooleanInput, getInput, getState, saveState, setOutput } from "@actions/core" @TypeScript
+import { restoreCache, saveCache } from "@actions/cache" @TypeScript
+import { ExecOptions, exec } from "@actions/exec" @TypeScript
+import { hashFiles } from "@actions/glob" @TypeScript
+import { downloadTool, extractTar } from "@actions/tool-cache" @TypeScript
+import { join } from "std/fs/path"
+import { env } from "std/process"
+import { split, trim } from "std/string"
+
+const dir = join(env("GITHUB_WORKSPACE")!, getInput("build-dir"))
+const archive = join(dir, "image.tar")
+/// exec's options by which it gives the exit status, not throws it.
+const status: ExecOptions = { ignoreReturnCode: true, cwd: null, silent: null, windowsVerbatimArguments: null,
+	failOnStdErr: null, delay: null, listeners: null }
+
+function main() {
+	if (args().includes("post")) {
+		save()
+	} else {
+		setup()
+	}
+}
+
+function setup() {
+	const platform = `${env("RUNNER_OS")!}-${env("RUNNER_ARCH")!}`
+	const url = getInput("download-url")
+	// At one path for every job, as what bober compiled holds where bober is.
+	const home = extractTar(downloadTool(if (url != "") url
+		else `https://github.com/bober-lang/bober/releases/download/edge/bober-${platform}.tar.gz`),
+		join(env("RUNNER_TOOL_CACHE")!, "bober"))
+	addPath(`${home}/bober/bin`)
+	const version = trim(readFile(`${home}/bober/lib/version`)!) // bober <commit> <date>
+	setOutput("version", version)
+	if (!getBooleanInput("cache")) {
+		return
+	}
+	const key = `bober-${platform}-${split(version, " ")[1]}-${getInput("cache-key")}-`
+	const hit = restoreCache([archive], key, [key]) != null && exec("tar", ["-xf", archive, "-C", dir], status) == 0.0
+	setOutput("cache-hit", `${hit}`)
+	if (hit) {
+		saveState("hash", hashFiles(archive))
+	}
+	saveState("key", key)
+}
+
+function save() {
+	const key = getState("key")
+	if (key == "") {
+		return
+	}
+	// kept's files by name, as the order of a directory's differs from file system to file system.
+	const tar = `cd "$0" && ls kept 2>/dev/null | sed s,^,kept/, | tar -cSf image.tar -T - image.so`
+	if (exec("sh", ["-c", tar, dir], status) != 0.0) {
+		print(`${dir} has no image to cache`)
+		return
+	}
+	const hash = hashFiles(archive)
+	if (hash == getState("hash")) {
+		print("The build image is unchanged.")
+		return
+	}
+	saveCache([archive], key + hash)
+}

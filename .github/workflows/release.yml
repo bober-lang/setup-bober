@@ -1,0 +1,21 @@
+name: release
+on:
+  push:
+    tags: ["v*.*.*"]
+permissions:
+  contents: write
+jobs:
+  # Commits dist/ onto the tagged commit, and points the tag and its major version, as v1, at that commit.
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/build
+      - run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -f dist
+          git commit -qm "dist: $GITHUB_REF_NAME"
+          git tag -f "$GITHUB_REF_NAME"
+          git tag -f "${GITHUB_REF_NAME%%.*}"
+          git push -f origin "$GITHUB_REF_NAME" "${GITHUB_REF_NAME%%.*}"

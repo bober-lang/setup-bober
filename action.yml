@@ -1,0 +1,26 @@
+name: Set up bober
+description: Installs bober and caches a project's build image, so a test run compiles and runs only what changed.
+inputs:
+  cache:
+    description: Whether to restore the build image, and save it once it changed.
+    default: "true"
+  cache-key:
+    description: A part of the cache's key, as for jobs of a matrix that build differently.
+    default: ""
+  build-dir:
+    description: >-
+      Where bober builds, relative to the workspace: build/ in the directory of the nearest bober.pkg, else of where
+      bober runs.
+    default: build
+  download-url:
+    description: The bober package to install; by default the edge release's for the runner.
+    default: ""
+outputs:
+  version:
+    description: What `bober version` prints, `bober <commit> <date>`.
+  cache-hit:
+    description: Whether a build image was restored.
+runs:
+  using: node24
+  main: dist/main.mjs
+  post: dist/post.mjs

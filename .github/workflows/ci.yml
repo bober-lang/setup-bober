@@ -1,0 +1,29 @@
+name: ci
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+jobs:
+  # Runs the action on test/ twice: cold, which saves the image, then warm, which restores it.
+  cold:
+    strategy: &os
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, ubuntu-24.04-arm, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps: &steps
+      - uses: actions/checkout@v5
+      - uses: ./.github/build
+      - id: bober
+        uses: ./
+        with:
+          cache-key: ${{ github.run_id }}-${{ github.run_attempt }}
+          build-dir: test/build
+      - run: '[ "${{ steps.bober.outputs.cache-hit }}" = "${{ github.job == ''warm'' }}" ]'
+      - run: time bober test
+        working-directory: test
+  warm:
+    needs: cold
+    strategy: *os
+    runs-on: ${{ matrix.os }}
+    steps: *steps

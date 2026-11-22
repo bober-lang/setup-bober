@@ -1,0 +1,14 @@
+/// How many primes are below n.
+export function primes(n: i32): i32 {
+	const composite = new bool[](n)
+	let count = 0
+	for (const i of 2 ... n - 1) {
+		if (!composite[i]) {
+			count++
+			for (let j = i * 2; j < n; j += i) {
+				composite[j] = true
+			}
+		}
+	}
+	return count
+}
